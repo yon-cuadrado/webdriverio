@@ -1,8 +1,7 @@
 import logger from '@wdio/logger'
 import type { Capabilities, Options } from '@wdio/types'
-// import type { RegisterOptions } from 'ts-node'
 
-import type { ModuleRequireService } from './types'
+import type { ModuleImportService } from './types.js'
 
 const log = logger('@wdio/config:utils')
 
@@ -51,7 +50,7 @@ export function validateConfig<T>(defaults: Options.Definition<T>, options: T, k
          * check if options is given
          */
         if (typeof options[name] === 'undefined' && !expectedOption.default && expectedOption.required) {
-            throw new Error(`Required option "${name}" is missing`)
+            throw new Error(`Required option "${name.toString()}" is missing`)
         }
 
         if (typeof options[name] === 'undefined' && expectedOption.default) {
@@ -61,19 +60,19 @@ export function validateConfig<T>(defaults: Options.Definition<T>, options: T, k
         if (typeof options[name] !== 'undefined') {
             const optValue = options[name]
             if (typeof optValue !== expectedOption.type) {
-                throw new Error(`Expected option "${name}" to be type of ${expectedOption.type} but was ${typeof options[name]}`)
+                throw new Error(`Expected option "${name.toString()}" to be type of ${expectedOption.type} but was ${typeof options[name]}`)
             }
 
             if (typeof expectedOption.validate === 'function') {
                 try {
                     expectedOption.validate(optValue)
                 } catch (e: any) {
-                    throw new Error(`Type check for option "${name}" failed: ${e.message}`)
+                    throw new Error(`Type check for option "${name.toString()}" failed: ${e.message}`)
                 }
             }
 
             if (typeof optValue === 'string' && expectedOption.match && !optValue.match(expectedOption.match)) {
-                throw new Error(`Option "${name}" doesn't match expected values: ${expectedOption.match}`)
+                throw new Error(`Option "${name.toString()}" doesn't match expected values: ${expectedOption.match}`)
             }
 
             params[name] = options[name]
@@ -92,17 +91,17 @@ export function validateConfig<T>(defaults: Options.Definition<T>, options: T, k
     return params
 }
 
-export function loadAutoCompilers(autoCompileConfig: Options.AutoCompileConfig, requireService: ModuleRequireService) {
+export async function loadAutoCompilers(autoCompileConfig: Options.AutoCompileConfig, requireService: ModuleImportService) {
     return (
         autoCompileConfig.autoCompile &&
         (
-            loadTypeScriptCompiler(
+            await loadTypeScriptCompiler(
                 autoCompileConfig.tsNodeOpts,
                 autoCompileConfig.tsConfigPathsOpts,
                 requireService
             )
             ||
-            loadBabelCompiler(
+            await loadBabelCompiler(
                 autoCompileConfig.babelOpts,
                 requireService
             )
@@ -110,19 +109,18 @@ export function loadAutoCompilers(autoCompileConfig: Options.AutoCompileConfig, 
     )
 }
 
-export function loadTypeScriptCompiler (
+export async function loadTypeScriptCompiler (
     tsNodeOpts: any = {},
     tsConfigPathsOpts: Options.TSConfigPathsOptions | undefined,
-    requireService: ModuleRequireService
+    requireService: ModuleImportService
 ) {
     try {
-        requireService.resolve('ts-node') as any
-        (requireService.require('ts-node') as any).register(tsNodeOpts)
+        (await requireService.import('ts-node') as any).register(tsNodeOpts)
         log.debug('Found \'ts-node\' package, auto-compiling TypeScript files')
 
         if (tsConfigPathsOpts) {
             log.debug('Found \'tsconfig-paths\' options, register paths')
-            const tsConfigPaths = require('tsconfig-paths')
+            const tsConfigPaths = await requireService.import('tsconfig-paths') as any
             tsConfigPaths.register(tsConfigPathsOpts)
         }
 
@@ -132,10 +130,8 @@ export function loadTypeScriptCompiler (
     }
 }
 
-export function loadBabelCompiler (babelOpts: Record<string, any> = {}, requireService: ModuleRequireService) {
+export async function loadBabelCompiler (babelOpts: Record<string, any> = {}, requireService: ModuleImportService) {
     try {
-        requireService.resolve('@babel/register') as any
-
         /**
          * only for testing purposes
          */
@@ -143,7 +139,7 @@ export function loadBabelCompiler (babelOpts: Record<string, any> = {}, requireS
             throw new Error('test fail')
         }
 
-        (requireService.require('@babel/register') as any)(babelOpts)
+        (await requireService.import('@babel/register') as any)(babelOpts)
         log.debug('Found \'@babel/register\' package, auto-compiling files with Babel')
         return true
     } catch (err: any) {

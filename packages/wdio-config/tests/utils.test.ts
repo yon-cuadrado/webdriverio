@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest'
 import { isCloudCapability, removeLineNumbers, validObjectOrArray } from '../src/utils'
 
 describe('utils', () => {
